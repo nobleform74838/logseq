@@ -694,6 +694,8 @@
   (when-let [conn (worker-state/get-datascript-conn repo)]
     (worker-db-validate/validate-db conn)))
 
+;; Returns an export-edn map for given repo. When there's an unexpected error, a map
+;; with key :export-edn-error is returned
 (def-thread-api :thread-api/export-edn
   [repo options]
   (let [conn (worker-state/get-datascript-conn repo)]
@@ -705,7 +707,7 @@
         (worker-util/post-message :notification
                                   ["An unexpected error occurred during export. See the javascript console for details."
                                    :error])
-        :export-edn-error))))
+        {:export-edn-error (.-message e)}))))
 
 (def-thread-api :thread-api/get-view-data
   [repo view-id option]
@@ -853,7 +855,11 @@
 (defn- create-page!
   [repo conn title options]
   (let [config (worker-state/get-config repo)]
-    (worker-page/create! repo conn config title options)))
+    (try
+      (worker-page/create! repo conn config title options)
+      (catch :default e
+        (js/console.error e)
+        (throw e)))))
 
 (defn- outliner-register-op-handlers!
   []
